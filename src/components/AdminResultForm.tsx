@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import {
   saveResultAction,
   recalcResultAction,
+  clearResultAction,
   type AdminState,
 } from "@/app/actions/admin";
 import { teamFlag } from "@/lib/teams";
@@ -15,6 +16,10 @@ export function AdminResultForm({ match }: { match: Match }) {
   const [state, action, pending] = useActionState(saveResultAction, initial);
   const [recalcState, recalcAction, recalcPending] = useActionState(
     recalcResultAction,
+    initial
+  );
+  const [clearState, clearAction, clearPending] = useActionState(
+    clearResultAction,
     initial
   );
 
@@ -78,28 +83,54 @@ export function AdminResultForm({ match }: { match: Match }) {
       </form>
 
       {match.points_calculated && (
-        <form action={recalcAction} className="mt-2">
-          <input type="hidden" name="matchId" value={match.id} />
-          <button
-            type="submit"
-            disabled={recalcPending}
-            className="w-full rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-slate-300 transition-colors hover:bg-white/5 disabled:opacity-50"
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <form action={recalcAction}>
+            <input type="hidden" name="matchId" value={match.id} />
+            <button
+              type="submit"
+              disabled={recalcPending}
+              className="w-full rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-slate-300 transition-colors hover:bg-white/5 disabled:opacity-50"
+            >
+              {recalcPending ? "Recalculando…" : "Recalcular puntos"}
+            </button>
+          </form>
+          <form
+            action={clearAction}
+            onSubmit={(e) => {
+              if (
+                !confirm(
+                  `¿Borrar el resultado de ${match.home_team} vs ${match.away_team}? El partido quedará abierto de nuevo y se reiniciarán sus puntos.`
+                )
+              ) {
+                e.preventDefault();
+              }
+            }}
           >
-            {recalcPending ? "Recalculando…" : "Recalcular puntos (sin cambiar marcador)"}
-          </button>
-        </form>
+            <input type="hidden" name="matchId" value={match.id} />
+            <button
+              type="submit"
+              disabled={clearPending}
+              className="w-full rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+            >
+              {clearPending ? "Borrando…" : "🗑️ Borrar resultado"}
+            </button>
+          </form>
+        </div>
       )}
 
-      {(state.error || recalcState.error) && (
+      {(state.error || recalcState.error || clearState.error) && (
         <p className="mt-2 text-center text-xs text-red-300">
-          {state.error ?? recalcState.error}
+          {state.error ?? recalcState.error ?? clearState.error}
         </p>
       )}
-      {(state.message || recalcState.message) && !state.error && !recalcState.error && (
-        <p className="mt-2 text-center text-xs font-medium text-emerald-300">
-          {state.message ?? recalcState.message}
-        </p>
-      )}
+      {(state.message || recalcState.message || clearState.message) &&
+        !state.error &&
+        !recalcState.error &&
+        !clearState.error && (
+          <p className="mt-2 text-center text-xs font-medium text-emerald-300">
+            {state.message ?? recalcState.message ?? clearState.message}
+          </p>
+        )}
     </article>
   );
 }

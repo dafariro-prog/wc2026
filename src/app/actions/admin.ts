@@ -94,6 +94,56 @@ export async function saveResultAction(
   };
 }
 
+/**
+ * Borra el resultado real de un partido: lo vuelve a 'scheduled', quita el
+ * marcador, desmarca points_calculated y resetea los puntos de las
+ * predicciones (conserva los marcadores pronosticados). Solo admin.
+ * Útil para deshacer una carga de prueba o equivocada.
+ */
+export async function clearResultAction(
+  _prev: AdminState,
+  formData: FormData
+): Promise<AdminState> {
+  const session = await getSession();
+  if (!session || session.role !== "admin") {
+    return { error: "No autorizado.", ok: false };
+  }
+
+  const matchId = String(formData.get("matchId") ?? "");
+  if (!matchId) return { error: "Partido inválido.", ok: false };
+
+  const sb = getServiceClient();
+
+  const { error: matchErr } = await sb
+    .from("matches")
+    .update({
+      home_score: null,
+      away_score: null,
+      status: "scheduled",
+      points_calculated: false,
+    })
+    .eq("id", matchId);
+  if (matchErr) return { error: "No se pudo borrar el resultado.", ok: false };
+
+  const { error: predErr } = await sb
+    .from("predictions")
+    .update({ points_awarded: 0, points_reason: null })
+    .eq("match_id", matchId);
+  if (predErr) {
+    return { error: "Resultado borrado, pero falló el reseteo de puntos.", ok: false };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/tabla");
+  revalidatePath("/dashboard");
+  revalidatePath(`/partido/${matchId}`);
+  return {
+    error: null,
+    ok: true,
+    message: "Resultado borrado. El partido quedó abierto de nuevo.",
+  };
+}
+
 /** Recalcula los puntos de un partido ya finalizado (sin cambiar el marcador). */
 export async function recalcResultAction(
   _prev: AdminState,
