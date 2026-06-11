@@ -52,6 +52,44 @@ export async function getMatchPredictions(
   }));
 }
 
+/**
+ * Partidos finalizados (con puntos calculados), del más reciente al más
+ * antiguo, junto con las predicciones de todos los participantes por partido.
+ */
+export async function getFinishedMatchesWithPredictions(): Promise<{
+  matches: Match[];
+  predsByMatch: Map<string, (Prediction & { user_name: string })[]>;
+}> {
+  const sb = getServiceClient();
+  const { data: matchData, error: matchErr } = await sb
+    .from("matches")
+    .select("*")
+    .eq("points_calculated", true)
+    .order("kickoff_at", { ascending: false });
+  if (matchErr) throw matchErr;
+
+  const matches = (matchData ?? []) as Match[];
+  const predsByMatch = new Map<string, (Prediction & { user_name: string })[]>();
+  if (matches.length === 0) return { matches, predsByMatch };
+
+  const ids = matches.map((m) => m.id);
+  const { data: predData, error: predErr } = await sb
+    .from("predictions")
+    .select("*, users(name)")
+    .in("match_id", ids);
+  if (predErr) throw predErr;
+
+  for (const p of (predData ?? []) as (Prediction & {
+    users: { name: string } | null;
+  })[]) {
+    const row = { ...p, user_name: p.users?.name ?? "—" };
+    const arr = predsByMatch.get(p.match_id);
+    if (arr) arr.push(row);
+    else predsByMatch.set(p.match_id, [row]);
+  }
+  return { matches, predsByMatch };
+}
+
 /** Tabla de posiciones (vista standings). */
 export async function getStandings(): Promise<Standing[]> {
   const sb = getServiceClient();

@@ -39,6 +39,7 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/predicciones/:path*",
+    "/resultados/:path*",
     "/tabla/:path*",
     "/partido/:path*",
     "/admin/:path*",
